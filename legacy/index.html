@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Moyo TB treatment companion dashboard">
+  <title>Moyo — TB treatment companion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="js/main.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#overview" aria-label="Moyo home">
+      <span class="brand-mark"><i data-lucide="heart-pulse"></i></span>
+      <span>Moyo</span>
+    </a>
+    <nav class="side-nav">
+      <p class="nav-label">CARE SPACE</p>
+      <a class="nav-item active" href="#overview" data-section="overview"><i data-lucide="layout-grid"></i><span>Overview</span></a>
+      <a class="nav-item" href="#medication" data-section="medication"><i data-lucide="pill"></i><span>Medication</span><span class="nav-badge" id="med-nav-badge">2</span></a>
+      <a class="nav-item" href="#health" data-section="health"><i data-lucide="activity"></i><span>Health check-in</span></a>
+      <a class="nav-item" href="#chat" data-section="chat"><i data-lucide="messages-square"></i><span>Ask Moyo</span></a>
+      <p class="nav-label secondary">SUPPORT</p>
+      <a class="nav-item" href="#learn" data-section="learn"><i data-lucide="book-open"></i><span>Learn</span></a>
+      <a class="nav-item" href="#care-team" data-section="care-team"><i data-lucide="users"></i><span>Care team</span></a>
+    </nav>
+    <article class="side-help">
+      <span class="help-icon"><i data-lucide="headphones"></i></span>
+      <strong>Need urgent help?</strong>
+      <p>Contact your care team if symptoms suddenly worsen.</p>
+      <button class="text-button" data-action="care-team">View care contacts <i data-lucide="arrow-right"></i></button>
+    </article>
+    <footer class="sidebar-footer">
+      <button class="profile-button" aria-label="Open profile">
+        <span class="avatar">AK</span><span class="profile-copy"><strong>Amara K.</strong><small>Patient ID · TB-2048</small></span><i data-lucide="chevrons-up-down"></i>
+      </button>
+    </footer>
+  </aside>
+
+  <header class="mobile-header">
+    <button class="icon-button" id="menu-button" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+    <a class="brand" href="#overview"><span class="brand-mark"><i data-lucide="heart-pulse"></i></span><span>Moyo</span></a>
+    <button class="icon-button"><i data-lucide="bell"></i></button>
+  </header>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div><p class="eyebrow" id="today-label">Monday, 18 May</p><h1>Good morning, Amara <span aria-hidden="true">👋🏾</span></h1><p class="subtitle">One day at a time. You're doing well.</p></div>
+      <div class="top-actions"><button class="icon-button notification-button" aria-label="Notifications"><i data-lucide="bell"></i><span></span></button><button class="primary-button" data-action="open-chat"><i data-lucide="sparkles"></i> Ask Moyo</button></div>
+    </header>
+
+    <section class="view active" id="overview" aria-labelledby="overview-title">
+      <h2 id="overview-title" class="sr-only">Treatment overview</h2>
+      <article class="treatment-card">
+        <div class="treatment-copy">
+          <span class="status-pill"><span></span> TREATMENT ON TRACK</span>
+          <h2>Day <span id="treatment-day">47</span> of 180</h2>
+          <p>Intensive phase · Week 7</p>
+          <div class="progress-track" role="progressbar" aria-label="Treatment progress" aria-valuemin="0" aria-valuemax="180" aria-valuenow="47"><span id="treatment-progress"></span></div>
+          <div class="progress-labels"><span>Started 2 Apr</span><strong id="progress-percent">26% complete</strong><span>Est. 28 Sep</span></div>
+        </div>
+        <div class="streak-visual"><div class="streak-ring"><i data-lucide="flame"></i><strong id="streak-count">12</strong><span>day streak</span></div><p>Longest streak: 24 days</p></div>
+      </article>
+
+      <section class="dashboard-grid">
+        <div class="main-column">
+          <header class="section-header"><div><p class="section-kicker">TODAY</p><h2>Your medication</h2></div><button class="text-button" data-action="medication">View schedule <i data-lucide="arrow-right"></i></button></header>
+          <article class="medication-card">
+            <div class="medicine-icon coral"><i data-lucide="pill"></i></div>
+            <div class="medicine-info"><h3>Morning dose</h3><p>Take after breakfast · 4 medicines</p><div class="medicine-tags"><span>Rifampicin 600mg</span><span>Isoniazid 300mg</span><span>+2 more</span></div></div>
+            <div class="dose-action"><p><i data-lucide="clock-3"></i> 8:00 AM</p><button class="take-button" id="take-dose-button"><i data-lucide="check"></i><span>Mark as taken</span></button></div>
+          </article>
+
+          <header class="section-header checkin-head"><div><p class="section-kicker">DAILY CHECK-IN</p><h2>How are you feeling today?</h2></div><span class="optional-label">Takes 30 seconds</span></header>
+          <article class="feeling-card">
+            <div class="mood-options" role="radiogroup" aria-label="Choose how you feel">
+              <button class="mood" data-mood="Struggling" aria-label="Struggling"><span>😣</span><small>Struggling</small></button>
+              <button class="mood" data-mood="Not great" aria-label="Not great"><span>😕</span><small>Not great</small></button>
+              <button class="mood" data-mood="Okay" aria-label="Okay"><span>😐</span><small>Okay</small></button>
+              <button class="mood" data-mood="Good" aria-label="Good"><span>🙂</span><small>Good</small></button>
+              <button class="mood" data-mood="Great" aria-label="Great"><span>😊</span><small>Great</small></button>
+            </div>
+            <button class="secondary-button" id="continue-checkin" disabled>Continue check-in <i data-lucide="arrow-right"></i></button>
+          </article>
+        </div>
+
+        <aside class="right-column">
+          <article class="moyo-card">
+            <div class="moyo-header"><span class="moyo-orb"><i data-lucide="sparkles"></i></span><div><h2>Ask Moyo</h2><p>Your health companion</p></div><span class="online-dot">Online</span></div>
+            <div class="chat-preview"><p>Hi Amara! How can I support you today?</p><span>10:24 AM</span></div>
+            <div class="quick-questions"><button data-question="What should I do if I miss a dose?">What if I miss a dose?</button><button data-question="Are orange tears normal?">Are orange tears normal?</button><button data-question="Can I exercise during treatment?">Can I exercise?</button></div>
+            <button class="chat-button" data-action="open-chat">Start a conversation <i data-lucide="arrow-up-right"></i></button>
+          </article>
+          <article class="appointment-card"><div class="appointment-title"><span><i data-lucide="calendar-days"></i></span><div><p>NEXT APPOINTMENT</p><h3>Tuesday, 26 May</h3></div></div><p><i data-lucide="clock"></i> 10:30 AM · TB Clinic</p><p><i data-lucide="map-pin"></i> Community Health Centre</p><button class="text-button" data-action="care-team">View details <i data-lucide="arrow-right"></i></button></article>
+        </aside>
+      </section>
+
+      <section class="insights-section">
+        <header class="section-header"><div><p class="section-kicker">THIS WEEK</p><h2>Your progress at a glance</h2></div><button class="filter-button">Last 7 days <i data-lucide="chevron-down"></i></button></header>
+        <div class="insight-grid">
+          <article class="insight-card"><span class="insight-icon green"><i data-lucide="circle-check"></i></span><div><p>Doses taken</p><strong id="weekly-doses">6 of 7</strong><small><b>↑ 14%</b> from last week</small></div><div class="mini-bars" aria-hidden="true"><i style="height:60%"></i><i style="height:75%"></i><i style="height:62%"></i><i style="height:85%"></i><i style="height:90%"></i><i style="height:78%"></i><i class="empty" style="height:38%"></i></div></article>
+          <article class="insight-card"><span class="insight-icon purple"><i data-lucide="heart-pulse"></i></span><div><p>Health check-ins</p><strong id="checkin-total">5 of 7</strong><small>Keep checking in daily</small></div><div class="dot-week" aria-label="Five of seven check-ins"><i></i><i></i><i></i><i></i><i></i><i class="empty"></i><i class="empty"></i></div></article>
+          <article class="insight-card"><span class="insight-icon orange"><i data-lucide="trending-up"></i></span><div><p>Overall wellbeing</p><strong id="wellbeing-label">Good</strong><small><b>Stable</b> this week</small></div><div class="sparkline" aria-hidden="true"><svg viewBox="0 0 120 45"><path d="M2 37 C17 34,18 19,32 25 S50 37,62 21 S80 13,91 18 S106 5,118 8"/><path class="area" d="M2 37 C17 34,18 19,32 25 S50 37,62 21 S80 13,91 18 S106 5,118 8 L118 45 L2 45Z"/></svg></div></article>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="medication" aria-labelledby="medication-title">
+      <header class="page-heading"><div><p class="section-kicker">TREATMENT PLAN</p><h2 id="medication-title">Medication schedule</h2><p>Keep each dose visible and on time.</p></div><span class="status-pill"><span></span> ACTIVE PLAN</span></header>
+      <div class="feature-grid"><article class="panel wide"><h3>Today's medicines</h3><div id="medicine-list"></div></article><article class="panel"><h3>Adherence</h3><div class="large-stat">94%</div><p>Excellent progress this month.</p></article></div>
+    </section>
+
+    <section class="view" id="health" aria-labelledby="health-title">
+      <header class="page-heading"><div><p class="section-kicker">HEALTH</p><h2 id="health-title">Daily health check-in</h2><p>Track symptoms and share a clearer picture with your care team.</p></div></header>
+      <article class="panel health-form"><h3>How are your symptoms today?</h3><div id="symptom-list"></div><label class="notes-label">Anything else you want to note?<textarea id="health-notes" placeholder="e.g. Slept better, mild nausea after breakfast..."></textarea></label><button class="primary-button" id="save-health">Save check-in</button></article>
+    </section>
+
+    <section class="view chat-page" id="chat" aria-labelledby="chat-title">
+      <header class="page-heading chat-page-head"><div class="moyo-header"><span class="moyo-orb"><i data-lucide="sparkles"></i></span><div><h2 id="chat-title">Ask Moyo</h2><p><span class="live-dot"></span> Here to support you</p></div></div><button class="icon-button" id="clear-chat" aria-label="Clear conversation"><i data-lucide="trash-2"></i></button></header>
+      <article class="full-chat"><div class="messages" id="chat-messages" aria-live="polite"></div><div class="suggested-prompts"><button data-question="What should I do if I miss a dose?">Missed dose</button><button data-question="I feel nauseous after my medicine">Nausea</button><button data-question="Can I exercise during treatment?">Exercise</button></div><form class="chat-input" id="chat-form"><label class="sr-only" for="chat-input-field">Message Moyo</label><input id="chat-input-field" autocomplete="off" placeholder="Ask about treatment, symptoms, or wellbeing..."><button type="submit" aria-label="Send message"><i data-lucide="arrow-up"></i></button></form><p class="chat-disclaimer">Moyo offers general guidance, not a diagnosis. For emergencies, contact local emergency services.</p></article>
+    </section>
+
+    <section class="view" id="learn" aria-labelledby="learn-title"><header class="page-heading"><div><p class="section-kicker">LEARN</p><h2 id="learn-title">Understand your treatment</h2><p>Clear, practical information for each stage of recovery.</p></div></header><div class="learning-grid" id="learning-grid"></div></section>
+
+    <section class="view" id="care-team" aria-labelledby="care-title"><header class="page-heading"><div><p class="section-kicker">SUPPORT</p><h2 id="care-title">Your care team</h2><p>Keep the people supporting your recovery close.</p></div></header><div class="feature-grid"><article class="panel contact-card"><span class="contact-avatar">DN</span><div><h3>Dr. Naomi Bello</h3><p>TB care coordinator</p></div><button class="secondary-button"><i data-lucide="phone"></i> Call clinic</button></article><article class="panel"><h3>Clinic hours</h3><p>Monday–Friday · 8:00 AM–5:00 PM</p><p class="muted">Community Health Centre<br>12 Hope Street</p></article></div></section>
+  </main>
+
+  <div class="modal-backdrop" id="checkin-modal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" aria-label="Close"><i data-lucide="x"></i></button><span class="modal-icon">✓</span><h2 id="modal-title">Check-in saved</h2><p>Thank you for checking in. Small updates help you see meaningful progress over time.</p><button class="primary-button modal-done">Done</button></section></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"><i data-lucide="circle-check"></i><span>Saved</span></div>
+</body>
+</html>
