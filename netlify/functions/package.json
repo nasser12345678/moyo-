@@ -1,0 +1,9 @@
+{
+  "name": "moyo-tb-functions",
+  "version": "1.0.0",
+  "description": "Serverless backend functions for Moyo TB website",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "@google/genai": "^0.1.2"
+  }
+}

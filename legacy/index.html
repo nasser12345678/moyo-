@@ -9,10 +9,38 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Auth guard: hide entire app shell until JS confirms session -->
+  <style>
+    #app-shell { opacity: 0; pointer-events: none; transition: opacity .25s; }
+    #app-shell.ready { opacity: 1; pointer-events: auto; }
+    #auth-overlay { display: none; }
+    #loading-screen {
+      position: fixed; inset: 0; background: var(--navy);
+      display: grid; place-items: center; z-index: 9998;
+      color: #d9eee5; font-family: 'Manrope', sans-serif;
+      flex-direction: column; gap: 16px;
+    }
+    #loading-screen .loader {
+      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.15);
+      border-top-color: #99d2b8; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    #loading-screen p { font-size: 13px; opacity: .6; margin: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/main.js" defer></script>
 </head>
 <body>
+  <!-- Loading spinner shown until auth state is determined -->
+  <div id="loading-screen">
+    <div class="loader"></div>
+    <p>Loading your care space…</p>
+  </div>
+
+  <!-- App shell (hidden until authenticated) -->
+  <div id="app-shell">
   <aside class="sidebar" id="sidebar" aria-label="Main navigation">
     <a class="brand" href="#overview" aria-label="Moyo home">
       <span class="brand-mark"><i data-lucide="heart-pulse"></i></span>
@@ -36,8 +64,9 @@
     </article>
     <footer class="sidebar-footer">
       <button class="profile-button" aria-label="Open profile">
-        <span class="avatar">AK</span><span class="profile-copy"><strong>Amara K.</strong><small>Patient ID · TB-2048</small></span><i data-lucide="chevrons-up-down"></i>
+        <span class="avatar" id="profile-avatar">AK</span><span class="profile-copy"><strong id="profile-email">Amara K.</strong><small>Patient ID · TB-2048</small></span><i data-lucide="chevrons-up-down"></i>
       </button>
+      <button id="logout-btn" class="secondary-button" style="width:100%; margin-top:10px; font-size:10px; display:flex; justify-content:center;"><i data-lucide="log-out"></i> Log Out</button>
     </footer>
   </aside>
 
@@ -128,8 +157,38 @@
 
     <section class="view" id="care-team" aria-labelledby="care-title"><header class="page-heading"><div><p class="section-kicker">SUPPORT</p><h2 id="care-title">Your care team</h2><p>Keep the people supporting your recovery close.</p></div></header><div class="feature-grid"><article class="panel contact-card"><span class="contact-avatar">DN</span><div><h3>Dr. Naomi Bello</h3><p>TB care coordinator</p></div><button class="secondary-button"><i data-lucide="phone"></i> Call clinic</button></article><article class="panel"><h3>Clinic hours</h3><p>Monday–Friday · 8:00 AM–5:00 PM</p><p class="muted">Community Health Centre<br>12 Hope Street</p></article></div></section>
   </main>
+  </div><!-- /app-shell -->
 
   <div class="modal-backdrop" id="checkin-modal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" aria-label="Close"><i data-lucide="x"></i></button><span class="modal-icon">✓</span><h2 id="modal-title">Check-in saved</h2><p>Thank you for checking in. Small updates help you see meaningful progress over time.</p><button class="primary-button modal-done">Done</button></section></div>
+
+  <!-- AUTHENTICATION OVERLAY (shown when no session) -->
+  <div id="auth-overlay" style="position:fixed;inset:0;background:var(--navy);z-index:9999;display:none;place-items:center;padding:20px;">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <span class="modal-icon" style="background:#fce9e0; color:var(--coral); border-radius:12px;"><i data-lucide="heart-pulse"></i></span>
+      <h2 id="auth-title">Welcome to Moyo</h2>
+      <p style="margin-bottom:15px; font-size:12px; color:var(--muted);">Please log in to access your secure TB care dashboard.</p>
+      
+      <div style="display:flex; margin-bottom:20px; border-bottom:1px solid var(--line);">
+        <button id="tab-login" class="text-button" style="flex:1; padding:10px; justify-content:center; color:var(--green); border-bottom:2px solid var(--green);" onclick="window.switchAuthTab('login')">Log In</button>
+        <button id="tab-signup" class="text-button" style="flex:1; padding:10px; justify-content:center; color:var(--muted); border-bottom:2px solid transparent;" onclick="window.switchAuthTab('signup')">Sign Up</button>
+      </div>
+
+      <form id="auth-form" style="text-align:left; display:flex; flex-direction:column; gap:12px;">
+        <label class="notes-label" style="margin-top:0;">Email Address
+          <input type="email" id="auth-email" required placeholder="patient@example.com" style="border:1px solid var(--line); border-radius:10px; padding:12px; outline:none; font-family:inherit;">
+        </label>
+        <label class="notes-label" style="margin-top:0;">Password
+          <input type="password" id="auth-password" required minlength="6" placeholder="••••••••" style="border:1px solid var(--line); border-radius:10px; padding:12px; outline:none; font-family:inherit;">
+        </label>
+        
+        <div id="auth-error" style="color:var(--coral); font-size:11px; display:none; background:#fde9e2; padding:8px; border-radius:6px; margin-top:5px; line-height:1.4;"></div>
+        <div id="auth-success" style="color:var(--green); font-size:11px; display:none; background:#dff1e7; padding:8px; border-radius:6px; margin-top:5px; line-height:1.4;"></div>
+        
+        <button type="submit" id="auth-submit-btn" class="primary-button" style="width:100%; margin-top:10px; padding:14px; font-size:14px;">Log In</button>
+      </form>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"><i data-lucide="circle-check"></i><span>Saved</span></div>
 </body>
 </html>
