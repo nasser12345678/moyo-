@@ -2,10 +2,11 @@
    MOYO – main.js  (Auth-first, per-user state)
    ============================================== */
 
-/* ── Supabase ── */
-const SUPABASE_URL     = 'https://wqyfxyzqgtndgmyobxfc.supabase.co';
+/* ── Supabase client ── */
+const SUPABASE_URL      = 'https://wqyfxyzqgtndgmyobxfc.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_dAeQs8XgnG8BBHAaVfzoxA_pwJyQk-f';
-const supabase = window.supabase
+// Use sbClient alias to avoid collision with window.supabase (CDN namespace object)
+const sbClient = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
@@ -195,7 +196,7 @@ async function sendMessage(text) {
   renderChat();
 }
 
-/* ── Load user profile & chat history from Supabase ── */
+/* ── Load user profile & chat history from sbClient ── */
 async function loadUserData() {
   /* Re-load state from per-user localStorage key */
   Object.assign(state, loadState());
@@ -206,7 +207,7 @@ async function loadUserData() {
   if (emailSpan)  emailSpan.textContent  = currentUser.email;
   if (avatarSpan) avatarSpan.textContent = currentUser.email.substring(0, 2).toUpperCase();
 
-  /* Restore chat history from Supabase */
+  /* Restore chat history from sbClient */
   try {
     const res = await fetch('/.netlify/functions/get-chat-history', {
       headers: { Authorization: `Bearer ${currentSessionToken}` }
@@ -347,7 +348,7 @@ function attachListeners() {
   /* Auth form */
   document.getElementById('auth-form')?.addEventListener('submit', async e => {
     e.preventDefault();
-    if (!supabase) return alert('Supabase not initialized');
+    if (!sbClient) return alert('sbClient not initialized');
     const email    = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
     const btn      = document.getElementById('auth-submit-btn');
@@ -361,12 +362,12 @@ function attachListeners() {
 
     try {
       if (window.authMode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await sbClient.auth.signUp({ email, password });
         if (error) throw error;
         succEl.textContent = 'Account created! Check your email to confirm, then log in.';
         succEl.style.display = 'block';
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await sbClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
         /* onAuthStateChange will fire and handle the rest */
       }
@@ -381,8 +382,8 @@ function attachListeners() {
 
   /* Logout */
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+    if (sbClient) {
+      await sbClient.auth.signOut();
       /* onAuthStateChange fires → showAuthOverlay() */
     }
   });
@@ -396,13 +397,13 @@ async function init() {
   attachListeners();
   renderSymptoms();   /* render static lists even before login */
 
-  if (!supabase) {
-    console.error('Supabase client could not be initialised.');
+  if (!sbClient) {
+    console.error('sbClient client could not be initialised.');
     return;
   }
 
   /* Listen for auth state changes (fires immediately with current session) */
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  sbClient.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
       currentUser         = session.user;
       currentSessionToken = session.access_token;
