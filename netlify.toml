@@ -1,7 +1,10 @@
 [build]
   publish   = "legacy"
   functions = "netlify/functions"
-  command   = "cd netlify/functions && npm install"
+  command   = "npm install"
+
+[functions]
+  node_bundler = "esbuild"
 
 [[redirects]]
   from   = "/api/*"
