@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseConfig } = require('./supabase-config.cjs');
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -17,8 +18,7 @@ exports.handler = async (event, context) => {
     }
     const token = authHeader.split(' ')[1];
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
     const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
     
     // Admin client for overriding RLS during text search if needed

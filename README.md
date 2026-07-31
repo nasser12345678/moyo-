@@ -1,16 +1,22 @@
-# React + Vite
+# Moyo TB Companion
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The deployed patient application is served from `legacy/` and uses Netlify Functions with Supabase for authenticated patient data.
 
-Currently, two official plugins are available:
+## Production configuration
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The deployed functions fall back to the same public Supabase URL and publishable key used by the patient app. To move the project or rotate that key, set these Netlify environment variables for the **Production** deploy context, then redeploy:
 
-## React Compiler
+- `SUPABASE_URL` — the Supabase project URL
+- `SUPABASE_ANON_KEY` — the Supabase anonymous/publishable key
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The functions `get-user-dashboard`, `save-medication-log`, and `save-checkin` use these values when present.
 
-## Expanding the Oxlint configuration
+## Database migration
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Apply `supabase_migration_v2.sql` in the Supabase SQL editor before using medication or check-in persistence. Alternatively, set a local-only `SUPABASE_DB_URL` and run:
+
+```powershell
+node execute_sql.cjs
+```
+
+Copy `.env.example` to `.env` for local configuration. Do not commit `.env` or database credentials.

@@ -2,15 +2,21 @@ const { Client } = require('pg');
 const fs = require('fs');
 
 async function main() {
-  const sql = fs.readFileSync('supabase_migration_v2.sql', 'utf8');
-  const uri = 'postgresql://postgres.wqyfxyzqgtndgmyobxfc:7LdAxuUdt%40da%2F%24g@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+  const uri = process.env.SUPABASE_DB_URL;
+  if (!uri) {
+    throw new Error('SUPABASE_DB_URL must be set before running this migration.');
+  }
 
   const client = new Client({ connectionString: uri, ssl: { rejectUnauthorized: false } });
   try {
     await client.connect();
     console.log('Connected successfully!');
-    await client.query(sql);
-    console.log('Migration v2 executed successfully!');
+    const verifyOnly = process.argv.includes('--verify');
+    if (!verifyOnly) {
+      const sql = fs.readFileSync('supabase_migration_v2.sql', 'utf8');
+      await client.query(sql);
+      console.log('Migration v2 executed successfully!');
+    }
 
     // Verify tables
     const res = await client.query(`
@@ -30,6 +36,23 @@ async function main() {
       AND tablename IN ('medication_logs', 'daily_checkins', 'treatment_plans');
     `);
     console.log('RLS status:', rls.rows);
+
+    const policies = await client.query(`
+      SELECT tablename, policyname, cmd
+      FROM pg_policies
+      WHERE schemaname = 'public'
+      AND tablename IN ('medication_logs', 'daily_checkins', 'treatment_plans')
+      ORDER BY tablename, policyname;
+    `);
+    console.log('Policies found:', policies.rows);
+
+    const medicationConstraint = await client.query(`
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = 'public.medication_logs'::regclass
+      AND contype = 'u';
+    `);
+    console.log('Medication unique constraints:', medicationConstraint.rows);
 
     await client.end();
   } catch (e) {

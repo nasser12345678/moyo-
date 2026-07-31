@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseConfig } = require('./supabase-config.cjs');
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -18,8 +19,7 @@ exports.handler = async (event, context) => {
     const token = authHeader.split(' ')[1];
 
     // Create a Supabase client authenticated AS THE USER
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });

@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseConfig } = require('./supabase-config.cjs');
 
 exports.handler = async (event) => {
   const headers = {
@@ -10,11 +11,13 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
   try {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader?.startsWith('Bearer ')) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
     const token = authHeader.split(' ')[1];
 
-    const userSb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    const userSb = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
 
@@ -56,7 +59,12 @@ exports.handler = async (event) => {
       })
     };
   } catch (err) {
-    console.error('Save checkin error:', err);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal Server Error' }) };
+    console.error('Save checkin error:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      hint: err.hint
+    });
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Unable to save check-in' }) };
   }
 };

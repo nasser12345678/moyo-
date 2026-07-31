@@ -21,6 +21,10 @@ CREATE INDEX IF NOT EXISTS idx_medlogs_user_date
 
 ALTER TABLE public.medication_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own medication logs" ON public.medication_logs;
+DROP POLICY IF EXISTS "Users can insert their own medication logs" ON public.medication_logs;
+DROP POLICY IF EXISTS "Users can update their own medication logs" ON public.medication_logs;
+
 CREATE POLICY "Users can view their own medication logs"
   ON public.medication_logs FOR SELECT
   TO authenticated USING (auth.uid() = user_id);
@@ -31,7 +35,7 @@ CREATE POLICY "Users can insert their own medication logs"
 
 CREATE POLICY "Users can update their own medication logs"
   ON public.medication_logs FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ──────────────────────────────────────────────
 -- 2. DAILY CHECK-INS
@@ -53,6 +57,10 @@ CREATE INDEX IF NOT EXISTS idx_checkins_user_date
 
 ALTER TABLE public.daily_checkins ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own check-ins" ON public.daily_checkins;
+DROP POLICY IF EXISTS "Users can insert their own check-ins" ON public.daily_checkins;
+DROP POLICY IF EXISTS "Users can update their own check-ins" ON public.daily_checkins;
+
 CREATE POLICY "Users can view their own check-ins"
   ON public.daily_checkins FOR SELECT
   TO authenticated USING (auth.uid() = user_id);
@@ -63,7 +71,7 @@ CREATE POLICY "Users can insert their own check-ins"
 
 CREATE POLICY "Users can update their own check-ins"
   ON public.daily_checkins FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ──────────────────────────────────────────────
 -- 3. TREATMENT PLANS
@@ -80,13 +88,17 @@ CREATE TABLE IF NOT EXISTS public.treatment_plans (
 
 ALTER TABLE public.treatment_plans ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own treatment plan" ON public.treatment_plans;
+DROP POLICY IF EXISTS "Users can update their own treatment plan" ON public.treatment_plans;
+DROP POLICY IF EXISTS "Users can insert their own treatment plan" ON public.treatment_plans;
+
 CREATE POLICY "Users can view their own treatment plan"
   ON public.treatment_plans FOR SELECT
   TO authenticated USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own treatment plan"
   ON public.treatment_plans FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own treatment plan"
   ON public.treatment_plans FOR INSERT

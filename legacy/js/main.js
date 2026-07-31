@@ -53,17 +53,35 @@ function showToast(text) {
 }
 
 async function api(path, opts = {}) {
-  const res = await fetch(`/.netlify/functions/${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${currentSessionToken}`,
-      ...(opts.headers || {})
-    }
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'API error');
+  let res;
+  try {
+    res = await fetch(`/.netlify/functions/${path}`, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${currentSessionToken}`,
+        ...(opts.headers || {})
+      }
+    });
+  } catch {
+    throw new Error('Network error while contacting the service');
+  }
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text || 'The service returned an invalid response' };
+  }
+
+  if (!res.ok) throw new Error(data.error || `Request failed with status ${res.status}`);
   return data;
+}
+
+function localDateString(date = new Date()) {
+  const timezoneOffsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
 }
 
 /* ── Auth UI ── */
@@ -290,29 +308,18 @@ async function loadAllUserData() {
 
 /* ── Medication: save to DB ── */
 async function saveMedicationToDB(singleIndex) {
-  try {
-    if (singleIndex !== undefined) {
-      // Single medicine toggle
-      await api('save-medication-log', {
-        method: 'POST',
-        body: JSON.stringify({
-          med_name: MEDICINE_NAMES[singleIndex],
-          taken: state.medicines[singleIndex]
-        })
-      });
-    } else {
-      // Bulk — all medicines
-      await api('save-medication-log', {
-        method: 'POST',
-        body: JSON.stringify({
-          medicines: MEDICINE_NAMES.map((name, i) => ({ name, taken: state.medicines[i] }))
-        })
-      });
-    }
-  } catch (e) {
-    console.error('Failed to save medication:', e);
-    showToast('Could not save — please try again');
+  const payload = { med_date: localDateString() };
+  if (singleIndex !== undefined) {
+    payload.med_name = MEDICINE_NAMES[singleIndex];
+    payload.taken = state.medicines[singleIndex];
+  } else {
+    payload.medicines = MEDICINE_NAMES.map((name, i) => ({ name, taken: state.medicines[i] }));
   }
+
+  return api('save-medication-log', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }
 
 /* ── Check-in: save to DB ── */
@@ -372,12 +379,20 @@ function attachListeners() {
 
   /* Medication — "Mark all as taken" */
   $('#take-dose-button').addEventListener('click', async () => {
+    const previousMedicines = [...state.medicines];
     const newState = !state.doseTaken;
     state.medicines = state.medicines.map(() => newState);
     state.doseTaken = newState;
     syncDoseUI();
-    showToast(newState ? 'Morning dose marked as taken' : 'Dose status updated');
-    await saveMedicationToDB();
+    try {
+      await saveMedicationToDB();
+      showToast(newState ? 'Morning dose marked as taken' : 'Dose status updated');
+    } catch (error) {
+      console.error('Failed to save medication:', error);
+      state.medicines = previousMedicines;
+      syncDoseUI();
+      showToast('Could not save your dose. Please try again.');
+    }
   });
 
   /* Medication — individual toggle */
@@ -385,10 +400,18 @@ function attachListeners() {
     const b = e.target.closest('[data-med-index]');
     if (!b) return;
     const i = +b.dataset.medIndex;
+    const previousMedicines = [...state.medicines];
     state.medicines[i] = !state.medicines[i];
     syncDoseUI();
-    showToast(`${MEDICINE_NAMES[i]} updated`);
-    await saveMedicationToDB(i);
+    try {
+      await saveMedicationToDB(i);
+      showToast(`${MEDICINE_NAMES[i]} updated`);
+    } catch (error) {
+      console.error('Failed to save medication:', error);
+      state.medicines = previousMedicines;
+      syncDoseUI();
+      showToast(`Could not save ${MEDICINE_NAMES[i]}. Please try again.`);
+    }
   });
 
   /* Mood selection */

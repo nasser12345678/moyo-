@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseConfig } = require('./supabase-config.cjs');
 
 exports.handler = async (event) => {
   const headers = {
@@ -10,18 +11,27 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
   try {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader?.startsWith('Bearer ')) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
     const token = authHeader.split(' ')[1];
 
-    const userSb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    const userSb = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
 
     const { data: { user }, error: authErr } = await userSb.auth.getUser();
     if (authErr || !user) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid session' }) };
 
-    const { medicines, med_date } = JSON.parse(event.body || '{}');
+    let body;
+    try {
+      body = JSON.parse(event.body || '{}');
+    } catch {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body must be valid JSON' }) };
+    }
+
+    const { medicines, med_date } = body;
     // medicines: [{name: 'Rifampicin', taken: true}, ...] OR single {med_name, taken}
     const targetDate = med_date || new Date().toISOString().split('T')[0];
 
@@ -37,7 +47,7 @@ exports.handler = async (event) => {
       }));
     } else {
       // Single medicine
-      const { med_name, taken } = JSON.parse(event.body || '{}');
+      const { med_name, taken } = body;
       if (!med_name) return { statusCode: 400, headers, body: JSON.stringify({ error: 'med_name required' }) };
       toUpsert = [{
         user_id:  user.id,
@@ -62,7 +72,12 @@ exports.handler = async (event) => {
       body: JSON.stringify({ success: true, date: targetDate, count: toUpsert.length })
     };
   } catch (err) {
-    console.error('Save medication error:', err);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal Server Error' }) };
+    console.error('Save medication error:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      hint: err.hint
+    });
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Unable to save medication' }) };
   }
 };
