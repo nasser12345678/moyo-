@@ -78,7 +78,7 @@
 
   <main class="main-content">
     <header class="topbar">
-      <div><p class="eyebrow" id="today-label">Monday, 18 May</p><h1>Good morning, Amara <span aria-hidden="true">👋🏾</span></h1><p class="subtitle">One day at a time. You're doing well.</p></div>
+      <div><p class="eyebrow" id="today-label">Monday, 18 May</p><h1>Good morning, <span id="greeting-name">Patient</span> <span aria-hidden="true">👋🏾</span></h1><p class="subtitle">One day at a time. You're doing well.</p></div>
       <div class="top-actions"><button class="icon-button notification-button" aria-label="Notifications"><i data-lucide="bell"></i><span></span></button><button class="primary-button" data-action="open-chat"><i data-lucide="sparkles"></i> Ask Moyo</button></div>
     </header>
 
@@ -87,12 +87,12 @@
       <article class="treatment-card">
         <div class="treatment-copy">
           <span class="status-pill"><span></span> TREATMENT ON TRACK</span>
-          <h2>Day <span id="treatment-day">47</span> of 180</h2>
-          <p>Intensive phase · Week 7</p>
-          <div class="progress-track" role="progressbar" aria-label="Treatment progress" aria-valuemin="0" aria-valuemax="180" aria-valuenow="47"><span id="treatment-progress"></span></div>
-          <div class="progress-labels"><span>Started 2 Apr</span><strong id="progress-percent">26% complete</strong><span>Est. 28 Sep</span></div>
+          <h2>Day <span id="treatment-day">—</span> of <span id="treatment-duration">180</span></h2>
+          <p><span id="treatment-phase">Intensive</span> phase · Week <span id="treatment-week">—</span></p>
+          <div class="progress-track" role="progressbar" aria-label="Treatment progress" aria-valuemin="0" aria-valuemax="180" aria-valuenow="0"><span id="treatment-progress"></span></div>
+          <div class="progress-labels"><span id="start-date-label">Started —</span><strong id="progress-percent">0% complete</strong><span id="end-date-label">Est. —</span></div>
         </div>
-        <div class="streak-visual"><div class="streak-ring"><i data-lucide="flame"></i><strong id="streak-count">12</strong><span>day streak</span></div><p>Longest streak: 24 days</p></div>
+        <div class="streak-visual"><div class="streak-ring"><i data-lucide="flame"></i><strong id="streak-count">0</strong><span>day streak</span></div></div>
       </article>
 
       <section class="dashboard-grid">
@@ -114,13 +114,14 @@
               <button class="mood" data-mood="Great" aria-label="Great"><span>😊</span><small>Great</small></button>
             </div>
             <button class="secondary-button" id="continue-checkin" disabled>Continue check-in <i data-lucide="arrow-right"></i></button>
+            <p id="checkin-status" style="display:none; color:var(--green); font-size:11px; margin-top:8px; font-weight:600;">✓ Already checked in today</p>
           </article>
         </div>
 
         <aside class="right-column">
           <article class="moyo-card">
             <div class="moyo-header"><span class="moyo-orb"><i data-lucide="sparkles"></i></span><div><h2>Ask Moyo</h2><p>Your health companion</p></div><span class="online-dot">Online</span></div>
-            <div class="chat-preview"><p>Hi Amara! How can I support you today?</p><span>10:24 AM</span></div>
+            <div class="chat-preview"><p>Hi <span class="chat-user-name">there</span>! How can I support you today?</p><span>10:24 AM</span></div>
             <div class="quick-questions"><button data-question="What should I do if I miss a dose?">What if I miss a dose?</button><button data-question="Are orange tears normal?">Are orange tears normal?</button><button data-question="Can I exercise during treatment?">Can I exercise?</button></div>
             <button class="chat-button" data-action="open-chat">Start a conversation <i data-lucide="arrow-up-right"></i></button>
           </article>
@@ -132,7 +133,7 @@
         <header class="section-header"><div><p class="section-kicker">THIS WEEK</p><h2>Your progress at a glance</h2></div><button class="filter-button">Last 7 days <i data-lucide="chevron-down"></i></button></header>
         <div class="insight-grid">
           <article class="insight-card"><span class="insight-icon green"><i data-lucide="circle-check"></i></span><div><p>Doses taken</p><strong id="weekly-doses">6 of 7</strong><small><b>↑ 14%</b> from last week</small></div><div class="mini-bars" aria-hidden="true"><i style="height:60%"></i><i style="height:75%"></i><i style="height:62%"></i><i style="height:85%"></i><i style="height:90%"></i><i style="height:78%"></i><i class="empty" style="height:38%"></i></div></article>
-          <article class="insight-card"><span class="insight-icon purple"><i data-lucide="heart-pulse"></i></span><div><p>Health check-ins</p><strong id="checkin-total">5 of 7</strong><small>Keep checking in daily</small></div><div class="dot-week" aria-label="Five of seven check-ins"><i></i><i></i><i></i><i></i><i></i><i class="empty"></i><i class="empty"></i></div></article>
+          <article class="insight-card"><span class="insight-icon purple"><i data-lucide="heart-pulse"></i></span><div><p>Health check-ins</p><strong id="checkin-total">0 of 7</strong><small>Keep checking in daily</small></div><div class="dot-week" id="checkin-dots" aria-label="Check-ins this week"></div></article>
           <article class="insight-card"><span class="insight-icon orange"><i data-lucide="trending-up"></i></span><div><p>Overall wellbeing</p><strong id="wellbeing-label">Good</strong><small><b>Stable</b> this week</small></div><div class="sparkline" aria-hidden="true"><svg viewBox="0 0 120 45"><path d="M2 37 C17 34,18 19,32 25 S50 37,62 21 S80 13,91 18 S106 5,118 8"/><path class="area" d="M2 37 C17 34,18 19,32 25 S50 37,62 21 S80 13,91 18 S106 5,118 8 L118 45 L2 45Z"/></svg></div></article>
         </div>
       </section>

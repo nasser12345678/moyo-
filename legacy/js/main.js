@@ -1,108 +1,118 @@
 /* ==============================================
-   MOYO – main.js  (Auth-first, per-user state)
+   MOYO – main.js  (Auth-first, DB-backed state)
    ============================================== */
 
 /* ── Supabase client ── */
 const SUPABASE_URL      = 'https://wqyfxyzqgtndgmyobxfc.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_dAeQs8XgnG8BBHAaVfzoxA_pwJyQk-f';
-// Use sbClient alias to avoid collision with window.supabase (CDN namespace object)
 const sbClient = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-let currentUser        = null;
+let currentUser         = null;
 let currentSessionToken = null;
 
-/* ── Per-user state helpers ── */
-function stateKey()   { return currentUser ? `moyoState_${currentUser.id}` : 'moyoState_guest'; }
-function loadState()  {
-  const raw = localStorage.getItem(stateKey());
-  const s   = raw ? JSON.parse(raw) : {};
-  s.doseTaken  ??= false;
-  s.medicines  ??= [false, false, false, false];
-  s.mood       ??= '';
-  s.checkins   ??= 5;
-  s.chat       ??= [];
-  return s;
-}
-function saveState()  { localStorage.setItem(stateKey(), JSON.stringify(state)); }
+/* ── Dashboard data from API ── */
+let dashboard = null;   // populated from get-user-dashboard
 
-let state = loadState();   // will be reloaded after login
+/* ── Local ephemeral state (session only, backed by DB) ── */
+let state = {
+  doseTaken: false,
+  medicines: [false, false, false, false],
+  mood: '',
+  chat: [],
+  checkinDoneToday: false
+};
 
 /* ── Static data ── */
-const medicines = [
-  ['Rifampicin',    '600 mg · 2 capsules',   '08:00 AM'],
-  ['Isoniazid',     '300 mg · 1 tablet',     '08:00 AM'],
-  ['Pyrazinamide',  '1,500 mg · 3 tablets',  '08:00 AM'],
-  ['Ethambutol',    '1,200 mg · 3 tablets',  '08:00 AM']
+const MEDICINE_NAMES = ['Rifampicin', 'Isoniazid', 'Pyrazinamide', 'Ethambutol'];
+const MEDICINE_INFO  = [
+  ['Rifampicin',   '600 mg · 2 capsules', '08:00 AM'],
+  ['Isoniazid',    '300 mg · 1 tablet',   '08:00 AM'],
+  ['Pyrazinamide', '1,500 mg · 3 tablets','08:00 AM'],
+  ['Ethambutol',   '1,200 mg · 3 tablets','08:00 AM']
 ];
-const symptoms = ['Cough', 'Nausea', 'Tiredness', 'Appetite'];
-const articles = [
-  ['MEDICATION',        'Why finishing treatment matters',    'Learn how every dose protects your recovery and prevents drug resistance.'],
-  ['SIDE EFFECTS',      'What changes are expected?',         'A practical guide to common effects and signs that need prompt medical attention.'],
-  ['DAILY LIFE',        'Food, rest, and movement',           'Simple ways to support your body while you complete treatment.'],
-  ['PROTECTING OTHERS', 'Reducing TB transmission',           'Understand ventilation, masks, testing, and when you are less likely to be infectious.']
+const SYMPTOMS = ['Cough', 'Nausea', 'Tiredness', 'Appetite'];
+const ARTICLES = [
+  ['MEDICATION',        'Why finishing treatment matters',  'Learn how every dose protects your recovery and prevents drug resistance.'],
+  ['SIDE EFFECTS',      'What changes are expected?',       'A practical guide to common effects and signs that need prompt medical attention.'],
+  ['DAILY LIFE',        'Food, rest, and movement',         'Simple ways to support your body while you complete treatment.'],
+  ['PROTECTING OTHERS', 'Reducing TB transmission',         'Understand ventilation, masks, testing, and when you are less likely to be infectious.']
 ];
 
 /* ── Utilities ── */
 function iconRefresh() { if (window.lucide) lucide.createIcons(); }
+function $(sel)        { return document.querySelector(sel); }
+function $$(sel)       { return document.querySelectorAll(sel); }
 function showToast(text) {
-  const t = document.querySelector('#toast');
+  const t = $('#toast');
   t.querySelector('span').textContent = text;
   t.classList.add('show');
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => t.classList.remove('show'), 2400);
 }
-function updateDate() {
-  document.querySelector('#today-label').textContent =
-    new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+
+async function api(path, opts = {}) {
+  const res = await fetch(`/.netlify/functions/${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${currentSessionToken}`,
+      ...(opts.headers || {})
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'API error');
+  return data;
 }
 
 /* ── Auth UI ── */
 window.authMode = 'login';
-window.switchAuthTab = function (mode) {
+window.switchAuthTab = function(mode) {
   window.authMode = mode;
   const isLogin = mode === 'login';
-  document.getElementById('tab-login').style.borderColor  = isLogin ? 'var(--green)' : 'transparent';
-  document.getElementById('tab-login').style.color        = isLogin ? 'var(--green)' : 'var(--muted)';
-  document.getElementById('tab-signup').style.borderColor = isLogin ? 'transparent' : 'var(--green)';
-  document.getElementById('tab-signup').style.color       = isLogin ? 'var(--muted)' : 'var(--green)';
-  document.getElementById('auth-submit-btn').textContent  = isLogin ? 'Log In' : 'Create Account';
-  document.getElementById('auth-error').style.display   = 'none';
-  document.getElementById('auth-success').style.display = 'none';
+  $('#tab-login').style.borderColor  = isLogin ? 'var(--green)' : 'transparent';
+  $('#tab-login').style.color        = isLogin ? 'var(--green)' : 'var(--muted)';
+  $('#tab-signup').style.borderColor = isLogin ? 'transparent' : 'var(--green)';
+  $('#tab-signup').style.color       = isLogin ? 'var(--muted)' : 'var(--green)';
+  $('#auth-submit-btn').textContent  = isLogin ? 'Log In' : 'Create Account';
+  $('#auth-error').style.display     = 'none';
+  $('#auth-success').style.display   = 'none';
 };
 
 function showAuthOverlay() {
-  document.getElementById('loading-screen')?.style && (document.getElementById('loading-screen').style.display = 'none');
-  const overlay = document.getElementById('auth-overlay');
-  if (overlay) { overlay.style.display = 'grid'; }
-  const shell = document.getElementById('app-shell');
-  if (shell) { shell.classList.remove('ready'); }
+  const ls = $('#loading-screen');
+  if (ls) ls.style.display = 'none';
+  const ov = $('#auth-overlay');
+  if (ov) ov.style.display = 'grid';
+  const sh = $('#app-shell');
+  if (sh) sh.classList.remove('ready');
 }
 
 function hideAuthOverlay() {
-  document.getElementById('loading-screen')?.style && (document.getElementById('loading-screen').style.display = 'none');
-  const overlay = document.getElementById('auth-overlay');
-  if (overlay) { overlay.style.display = 'none'; }
-  const shell = document.getElementById('app-shell');
-  if (shell) { shell.classList.add('ready'); }
+  const ls = $('#loading-screen');
+  if (ls) ls.style.display = 'none';
+  const ov = $('#auth-overlay');
+  if (ov) ov.style.display = 'none';
+  const sh = $('#app-shell');
+  if (sh) sh.classList.add('ready');
 }
 
 /* ── Navigation ── */
 function navigate(section) {
   const target = document.getElementById(section) || document.getElementById('overview');
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v === target));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.section === target.id));
-  document.querySelector('#sidebar').classList.remove('open');
-  document.querySelector('#menu-button')?.setAttribute('aria-expanded', 'false');
+  $$('.view').forEach(v => v.classList.toggle('active', v === target));
+  $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.section === target.id));
+  $('#sidebar').classList.remove('open');
+  $('#menu-button')?.setAttribute('aria-expanded', 'false');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (location.hash !== `#${target.id}`) history.pushState(null, '', `#${target.id}`);
-  if (target.id === 'chat') setTimeout(() => document.querySelector('#chat-input-field').focus(), 100);
+  if (target.id === 'chat') setTimeout(() => $('#chat-input-field').focus(), 100);
 }
 
-/* ── Medicine list ── */
+/* ── Render: Medicine list ── */
 function renderMedicineList() {
-  document.querySelector('#medicine-list').innerHTML = medicines.map((m, i) => `
+  $('#medicine-list').innerHTML = MEDICINE_INFO.map((m, i) => `
     <article class="medicine-row">
       <span class="medicine-icon ${i === 0 ? 'coral' : ''}"><i data-lucide="${i % 2 ? 'circle-dot' : 'pill'}"></i></span>
       <div><h4>${m[0]}</h4><p>${m[1]} · ${m[2]}</p></div>
@@ -114,20 +124,20 @@ function renderMedicineList() {
   iconRefresh();
 }
 
-function syncDose() {
-  const btn = document.querySelector('#take-dose-button');
+function syncDoseUI() {
+  const btn = $('#take-dose-button');
+  state.doseTaken = state.medicines.every(Boolean);
   btn.classList.toggle('taken', state.doseTaken);
-  btn.querySelector('span').textContent = state.doseTaken ? 'Taken at 8:06 AM' : 'Mark as taken';
-  state.medicines = state.medicines.map(() => state.doseTaken);
-  document.querySelector('#med-nav-badge').textContent   = state.doseTaken ? '✓' : '2';
-  document.querySelector('#weekly-doses').textContent    = state.doseTaken ? '7 of 7' : '6 of 7';
+  btn.querySelector('span').textContent = state.doseTaken
+    ? `Taken at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Mark as taken';
+  $('#med-nav-badge').textContent = state.doseTaken ? '✓' : String(state.medicines.filter(m => !m).length);
   renderMedicineList();
-  saveState();
 }
 
-/* ── Symptoms ── */
+/* ── Render: Symptoms ── */
 function renderSymptoms() {
-  document.querySelector('#symptom-list').innerHTML = symptoms.map(s => `
+  $('#symptom-list').innerHTML = SYMPTOMS.map(s => `
     <div class="symptom-row" data-symptom="${s}">
       <p>${s}</p>
       ${['None', 'Mild', 'Moderate', 'Severe'].map(l =>
@@ -135,14 +145,13 @@ function renderSymptoms() {
     </div>`).join('');
 }
 
-/* ── Chat ── */
-function initialChatMessage() {
-  return [{ role: 'bot', text: "Hi — I'm Moyo. I can help with general TB treatment questions, medication routines, and wellbeing check-ins. What's on your mind?" }];
-}
-
+/* ── Render: Chat ── */
 function renderChat() {
-  const container = document.querySelector('#chat-messages');
-  const items     = state.chat.length ? state.chat : initialChatMessage();
+  const container = $('#chat-messages');
+  const name = dashboard?.display_name || 'there';
+  const items = state.chat.length ? state.chat : [
+    { role: 'bot', text: `Hi ${name} — I'm Moyo. I can help with general TB treatment questions, medication routines, and wellbeing check-ins. What's on your mind?` }
+  ];
   container.innerHTML = items.map(m =>
     `<div class="message ${m.role}">${m.text}<time>${m.time || 'Now'}</time></div>`
   ).join('');
@@ -150,16 +159,9 @@ function renderChat() {
 }
 
 async function sendMessage(text) {
-  if (!text.trim()) return;
-
-  if (!currentSessionToken) {
-    showToast('Please log in to use the chat.');
-    return;
-  }
-
+  if (!text.trim() || !currentSessionToken) return;
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   state.chat.push({ role: 'user', text: text.trim(), time });
-  saveState();
   renderChat();
 
   const tempId = Date.now();
@@ -167,21 +169,15 @@ async function sendMessage(text) {
   renderChat();
 
   try {
-    const res = await fetch('/.netlify/functions/ask-tb-assistant', {
+    const result = await api('ask-tb-assistant', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentSessionToken}` },
       body: JSON.stringify({ question: text.trim() })
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Failed to get response');
-
     let answerHtml = result.answer;
     if (result.sources?.length) {
-      answerHtml += `<br><br><small style="color:var(--green)">📚 Verified Sources: ${
-        result.sources.map(s => `<strong>${s.title}</strong>`).join(', ')
-      }</small>`;
+      answerHtml += `<br><br><small style="color:var(--green)">📚 Sources: ${
+        result.sources.map(s => `<strong>${s.title}</strong>`).join(', ')}</small>`;
     }
-
     const idx = state.chat.findIndex(m => m.id === tempId);
     if (idx !== -1) {
       state.chat[idx].text = answerHtml;
@@ -189,55 +185,166 @@ async function sendMessage(text) {
     }
   } catch (err) {
     const idx = state.chat.findIndex(m => m.id === tempId);
-    if (idx !== -1) state.chat[idx].text = `⚠️ Error: ${err.message}. Please try again.`;
+    if (idx !== -1) state.chat[idx].text = `⚠️ ${err.message}`;
   }
-
-  saveState();
   renderChat();
 }
 
-/* ── Load user profile & chat history from sbClient ── */
-async function loadUserData() {
-  /* Re-load state from per-user localStorage key */
-  Object.assign(state, loadState());
+/* ── Render: Dashboard from API data ── */
+function applyDashboard(d) {
+  dashboard = d;
 
-  /* Update profile UI */
-  const emailSpan  = document.getElementById('profile-email');
-  const avatarSpan = document.getElementById('profile-avatar');
-  if (emailSpan)  emailSpan.textContent  = currentUser.email;
-  if (avatarSpan) avatarSpan.textContent = currentUser.email.substring(0, 2).toUpperCase();
+  /* Greeting & profile */
+  const name = d.display_name || 'Patient';
+  const initials = name.substring(0, 2).toUpperCase();
+  $('#greeting-name').textContent   = name;
+  $('#profile-email').textContent   = name;
+  $('#profile-avatar').textContent  = initials;
+  $$('.chat-user-name').forEach(el => el.textContent = name);
 
-  /* Restore chat history from sbClient */
-  try {
-    const res = await fetch('/.netlify/functions/get-chat-history', {
-      headers: { Authorization: `Bearer ${currentSessionToken}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.messages?.length) {
-        state.chat = data.messages.map(m => ({
-          id:   m.id,
-          role: m.role,
-          text: m.content + (m.sources?.length
-            ? `<br><br><small style="color:var(--green)">📚 Verified Sources: ${
-                m.sources.map(s => s.title).join(', ')}</small>`
-            : ''),
-          time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
-        saveState();
-      }
+  /* Treatment progress */
+  $('#treatment-day').textContent      = d.treatment_day;
+  $('#treatment-duration').textContent = d.treatment_duration;
+  $('#treatment-week').textContent     = Math.ceil(d.treatment_day / 7);
+  $('#treatment-phase').textContent    = d.treatment_phase === 'intensive' ? 'Intensive' : 'Continuation';
+  const progress = $('#treatment-progress');
+  progress.style.width = d.progress_pct + '%';
+  $('#progress-percent').textContent = d.progress_pct + '% complete';
+
+  /* Dates */
+  const startD = new Date(d.start_date);
+  const endD   = new Date(startD.getTime() + d.treatment_duration * 86400000);
+  const fmt    = { day: 'numeric', month: 'short' };
+  $('#start-date-label').textContent = `Started ${startD.toLocaleDateString('en-GB', fmt)}`;
+  $('#end-date-label').textContent   = `Est. ${endD.toLocaleDateString('en-GB', fmt)}`;
+
+  /* Streak */
+  $('#streak-count').textContent = d.current_streak;
+
+  /* Medication status from DB */
+  state.medicines = d.medication_status.map(m => m.taken);
+  state.doseTaken = d.all_taken_today;
+  syncDoseUI();
+
+  /* Check-in status */
+  state.checkinDoneToday = d.checkin_done_today;
+  const checkinBtn    = $('#continue-checkin');
+  const checkinStatus = $('#checkin-status');
+  if (d.checkin_done_today) {
+    checkinBtn.disabled = true;
+    checkinBtn.style.display = 'none';
+    checkinStatus.style.display = 'block';
+    /* Pre-select today's mood */
+    if (d.today_mood) {
+      const moodBtn = document.querySelector(`[data-mood="${d.today_mood}"]`);
+      if (moodBtn) moodBtn.classList.add('selected');
     }
-  } catch (e) { console.warn('Could not load chat history:', e); }
+  } else {
+    checkinBtn.style.display = '';
+    checkinStatus.style.display = 'none';
+  }
+
+  /* Wellbeing label */
+  if (d.today_mood) {
+    $('#wellbeing-label').textContent = d.today_mood;
+  }
+
+  /* Weekly stats */
+  $('#weekly-doses').textContent  = `${d.weekly_doses_taken} of ${d.weekly_doses_possible}`;
+  $('#checkin-total').textContent = `${d.weekly_checkins} of ${d.weekly_checkins_possible}`;
+
+  /* Check-in dots */
+  const dotsEl = $('#checkin-dots');
+  if (dotsEl) {
+    dotsEl.innerHTML = Array.from({ length: 7 }, (_, i) =>
+      `<i${i < d.weekly_checkins ? '' : ' class="empty"'}></i>`
+    ).join('');
+  }
+
+  iconRefresh();
 }
 
-/* ── Render the whole dashboard ── */
+/* ── Load everything on login ── */
+async function loadAllUserData() {
+  try {
+    /* Dashboard data (treatment, meds, checkins, streaks) */
+    const d = await api('get-user-dashboard');
+    applyDashboard(d);
+
+    /* Chat history */
+    const h = await api('get-chat-history');
+    if (h.messages?.length) {
+      state.chat = h.messages.map(m => ({
+        id:   m.id,
+        role: m.role,
+        text: m.content + (m.sources?.length
+          ? `<br><br><small style="color:var(--green)">📚 Sources: ${m.sources.map(s => s.title).join(', ')}</small>` : ''),
+        time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+    }
+    renderChat();
+  } catch (e) {
+    console.error('Failed to load user data:', e);
+  }
+}
+
+/* ── Medication: save to DB ── */
+async function saveMedicationToDB(singleIndex) {
+  try {
+    if (singleIndex !== undefined) {
+      // Single medicine toggle
+      await api('save-medication-log', {
+        method: 'POST',
+        body: JSON.stringify({
+          med_name: MEDICINE_NAMES[singleIndex],
+          taken: state.medicines[singleIndex]
+        })
+      });
+    } else {
+      // Bulk — all medicines
+      await api('save-medication-log', {
+        method: 'POST',
+        body: JSON.stringify({
+          medicines: MEDICINE_NAMES.map((name, i) => ({ name, taken: state.medicines[i] }))
+        })
+      });
+    }
+  } catch (e) {
+    console.error('Failed to save medication:', e);
+    showToast('Could not save — please try again');
+  }
+}
+
+/* ── Check-in: save to DB ── */
+async function saveCheckinToDB(mood, symptoms, notes) {
+  try {
+    const result = await api('save-checkin', {
+      method: 'POST',
+      body: JSON.stringify({ mood, symptoms, notes })
+    });
+    state.checkinDoneToday = true;
+    $('#continue-checkin').disabled = true;
+    $('#continue-checkin').style.display = 'none';
+    $('#checkin-status').style.display = 'block';
+    showToast(result.message || 'Check-in saved!');
+    return result;
+  } catch (e) {
+    console.error('Failed to save check-in:', e);
+    showToast('Could not save check-in');
+  }
+}
+
+/* ── Render dashboard static elements ── */
 function renderDashboard() {
-  updateDate();
+  $('#today-label').textContent = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  }).format(new Date());
+
   renderMedicineList();
   renderSymptoms();
   renderChat();
 
-  document.querySelector('#learning-grid').innerHTML = articles.map(a => `
+  $('#learning-grid').innerHTML = ARTICLES.map(a => `
     <article class="learning-card">
       <div class="learning-color"></div>
       <div class="learning-copy">
@@ -245,135 +352,140 @@ function renderDashboard() {
         <button class="text-button">Read article <i data-lucide="arrow-right"></i></button>
       </div>
     </article>`).join('');
-
-  if (state.doseTaken) syncDose();
-  if (state.mood) {
-    document.querySelector(`[data-mood="${state.mood}"]`)?.classList.add('selected');
-    document.querySelector('#continue-checkin').disabled = false;
-    document.querySelector('#wellbeing-label').textContent = state.mood;
-  }
   iconRefresh();
 }
 
-/* ── Wire up all event listeners (called once on DOMContentLoaded) ── */
+/* ── Attach all event listeners ── */
 function attachListeners() {
   /* Navigation */
-  document.querySelectorAll('.nav-item').forEach(l =>
-    l.addEventListener('click', e => { e.preventDefault(); navigate(l.dataset.section); }));
-  document.querySelectorAll('[data-action]').forEach(b =>
-    b.addEventListener('click', () => navigate(b.dataset.action === 'open-chat' ? 'chat' : b.dataset.action)));
-  document.querySelector('#menu-button').addEventListener('click', e => {
-    const s = document.querySelector('#sidebar');
-    s.classList.toggle('open');
+  $$('.nav-item').forEach(l => l.addEventListener('click', e => { e.preventDefault(); navigate(l.dataset.section); }));
+  $$('[data-action]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.action === 'open-chat' ? 'chat' : b.dataset.action)));
+  $('#menu-button').addEventListener('click', e => {
+    const s = $('#sidebar'); s.classList.toggle('open');
     e.currentTarget.setAttribute('aria-expanded', s.classList.contains('open'));
   });
   document.addEventListener('click', e => {
     if (innerWidth <= 760 && !e.target.closest('#sidebar') && !e.target.closest('#menu-button'))
-      document.querySelector('#sidebar').classList.remove('open');
+      $('#sidebar').classList.remove('open');
   });
   window.addEventListener('popstate', () => navigate(location.hash.slice(1) || 'overview'));
 
-  /* Medication */
-  document.querySelector('#take-dose-button').addEventListener('click', () => {
-    state.doseTaken = !state.doseTaken;
-    syncDose();
-    showToast(state.doseTaken ? 'Morning dose marked as taken' : 'Dose status updated');
+  /* Medication — "Mark all as taken" */
+  $('#take-dose-button').addEventListener('click', async () => {
+    const newState = !state.doseTaken;
+    state.medicines = state.medicines.map(() => newState);
+    state.doseTaken = newState;
+    syncDoseUI();
+    showToast(newState ? 'Morning dose marked as taken' : 'Dose status updated');
+    await saveMedicationToDB();
   });
-  document.querySelector('#medicine-list').addEventListener('click', e => {
+
+  /* Medication — individual toggle */
+  $('#medicine-list').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-med-index]');
     if (!b) return;
     const i = +b.dataset.medIndex;
     state.medicines[i] = !state.medicines[i];
-    state.doseTaken = state.medicines.every(Boolean);
-    saveState(); renderMedicineList();
-    showToast(`${medicines[i][0]} updated`);
+    syncDoseUI();
+    showToast(`${MEDICINE_NAMES[i]} updated`);
+    await saveMedicationToDB(i);
   });
 
-  /* Mood / checkin */
-  document.querySelectorAll('.mood').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.mood').forEach(x => x.classList.remove('selected'));
-      btn.classList.add('selected');
-      state.mood = btn.dataset.mood;
-      document.querySelector('#continue-checkin').disabled = false;
+  /* Mood selection */
+  $$('.mood').forEach(btn => btn.addEventListener('click', () => {
+    if (state.checkinDoneToday) return; // Already checked in today
+    $$('.mood').forEach(x => x.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.mood = btn.dataset.mood;
+    $('#continue-checkin').disabled = false;
+  }));
+
+  /* Continue check-in → save mood + symptoms to DB */
+  $('#continue-checkin').addEventListener('click', async () => {
+    if (state.checkinDoneToday) return;
+    if (!state.mood) return;
+
+    // Collect symptom answers
+    const symptoms = [...$$('.symptom-row')].map(r => ({
+      symptom: r.dataset.symptom,
+      level:   r.querySelector('.selected')?.dataset.level || 'Not answered'
     }));
-  document.querySelector('#continue-checkin').addEventListener('click', () => {
-    state.checkins = Math.min(7, state.checkins + 1);
-    document.querySelector('#checkin-total').textContent = `${state.checkins} of 7`;
-    document.querySelector('#wellbeing-label').textContent = state.mood;
-    saveState();
-    document.querySelector('#checkin-modal').hidden = false;
-  });
-  document.querySelectorAll('.modal-close,.modal-done').forEach(b =>
-    b.addEventListener('click', () => document.querySelector('#checkin-modal').hidden = true));
-  document.querySelector('#checkin-modal').addEventListener('click', e => {
-    if (e.target.id === 'checkin-modal') e.currentTarget.hidden = true;
+    const notes = $('#health-notes')?.value || '';
+
+    await saveCheckinToDB(state.mood, symptoms, notes);
+
+    // Update wellbeing label
+    $('#wellbeing-label').textContent = state.mood;
+
+    // Show confirmation modal
+    $('#checkin-modal').hidden = false;
   });
 
-  /* Health */
-  document.querySelector('#symptom-list').addEventListener('click', e => {
+  /* Modal close */
+  $$('.modal-close,.modal-done').forEach(b => b.addEventListener('click', () => $('#checkin-modal').hidden = true));
+  $('#checkin-modal').addEventListener('click', e => { if (e.target.id === 'checkin-modal') e.currentTarget.hidden = true; });
+
+  /* Health symptom severity */
+  $('#symptom-list').addEventListener('click', e => {
     if (!e.target.classList.contains('severity')) return;
     e.target.parentElement.querySelectorAll('.severity').forEach(b => b.classList.remove('selected'));
     e.target.classList.add('selected');
   });
-  document.querySelector('#save-health').addEventListener('click', () => {
-    const answers = [...document.querySelectorAll('.symptom-row')].map(r => ({
+
+  /* Save health — now also saves to DB as a check-in update */
+  $('#save-health').addEventListener('click', async () => {
+    const symptoms = [...$$('.symptom-row')].map(r => ({
       symptom: r.dataset.symptom,
       level:   r.querySelector('.selected')?.dataset.level || 'Not answered'
     }));
-    state.health = { answers, notes: document.querySelector('#health-notes').value, date: new Date().toISOString() };
-    saveState();
+    const notes = $('#health-notes').value;
+
+    // If mood not set, use last known
+    const mood = state.mood || dashboard?.today_mood || 'Okay';
+    await saveCheckinToDB(mood, symptoms, notes);
     showToast('Health check-in saved');
   });
 
   /* Chat */
-  document.querySelector('#chat-form').addEventListener('submit', e => {
+  $('#chat-form').addEventListener('submit', e => {
     e.preventDefault();
-    const input = document.querySelector('#chat-input-field');
+    const input = $('#chat-input-field');
     sendMessage(input.value);
     input.value = '';
   });
-  document.querySelectorAll('[data-question]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      navigate('chat');
-      setTimeout(() => sendMessage(btn.dataset.question), 120);
-    }));
-  document.querySelector('#clear-chat').addEventListener('click', () => {
+  $$('[data-question]').forEach(btn => btn.addEventListener('click', () => {
+    navigate('chat');
+    setTimeout(() => sendMessage(btn.dataset.question), 120);
+  }));
+  $('#clear-chat').addEventListener('click', () => {
     state.chat = [];
-    saveState();
     renderChat();
     showToast('Conversation cleared');
   });
 
   /* Auth form */
-  document.getElementById('auth-form')?.addEventListener('submit', async e => {
+  $('#auth-form')?.addEventListener('submit', async e => {
     e.preventDefault();
-    if (!sbClient) return alert('sbClient not initialized');
-    const email    = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const btn      = document.getElementById('auth-submit-btn');
-    const errEl    = document.getElementById('auth-error');
-    const succEl   = document.getElementById('auth-success');
-
-    errEl.style.display = 'none';
-    succEl.style.display = 'none';
-    btn.disabled = true;
-    btn.textContent = 'Processing…';
-
+    if (!sbClient) return alert('Supabase not initialized');
+    const email = $('#auth-email').value.trim();
+    const pw    = $('#auth-password').value;
+    const btn   = $('#auth-submit-btn');
+    const errEl = $('#auth-error');
+    const sucEl = $('#auth-success');
+    errEl.style.display = 'none'; sucEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Processing…';
     try {
       if (window.authMode === 'signup') {
-        const { error } = await sbClient.auth.signUp({ email, password });
+        const { error } = await sbClient.auth.signUp({ email, password: pw });
         if (error) throw error;
-        succEl.textContent = 'Account created! Check your email to confirm, then log in.';
-        succEl.style.display = 'block';
+        sucEl.textContent = 'Account created! Check your email to confirm, then log in.';
+        sucEl.style.display = 'block';
       } else {
-        const { error } = await sbClient.auth.signInWithPassword({ email, password });
+        const { error } = await sbClient.auth.signInWithPassword({ email, password: pw });
         if (error) throw error;
-        /* onAuthStateChange will fire and handle the rest */
       }
     } catch (err) {
-      errEl.textContent = err.message;
-      errEl.style.display = 'block';
+      errEl.textContent = err.message; errEl.style.display = 'block';
     } finally {
       btn.disabled = false;
       btn.textContent = window.authMode === 'login' ? 'Log In' : 'Create Account';
@@ -381,57 +493,38 @@ function attachListeners() {
   });
 
   /* Logout */
-  document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    if (sbClient) {
-      await sbClient.auth.signOut();
-      /* onAuthStateChange fires → showAuthOverlay() */
-    }
+  $('#logout-btn')?.addEventListener('click', async () => {
+    if (sbClient) await sbClient.auth.signOut();
   });
 }
 
 /* ── Boot ── */
 async function init() {
-  /* Hide the dashboard immediately — show only after auth confirmed */
   showAuthOverlay();
-
   attachListeners();
-  renderSymptoms();   /* render static lists even before login */
+  renderSymptoms();
 
   if (!sbClient) {
-    console.error('sbClient client could not be initialised.');
+    console.error('Supabase client could not be initialised.');
     return;
   }
 
-  /* Listen for auth state changes (fires immediately with current session) */
   sbClient.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
       currentUser         = session.user;
       currentSessionToken = session.access_token;
 
-      /* Reload per-user state from localStorage */
-      const freshState = loadState();
-      Object.assign(state, freshState);
-
-      /* Render the dashboard then load remote history */
       renderDashboard();
       hideAuthOverlay();
       navigate(location.hash.slice(1) || 'overview');
 
-      /* Fetch cloud chat history (may override local) */
-      await loadUserData();
-      renderChat();
-
+      /* Load all data from Supabase */
+      await loadAllUserData();
     } else {
-      /* Logged out or no session */
       currentUser         = null;
       currentSessionToken = null;
-
-      /* Wipe any cached state from memory (don't clear localStorage — other users may share device) */
-      Object.assign(state, {
-        doseTaken: false, medicines: [false, false, false, false],
-        mood: '', checkins: 5, chat: []
-      });
-
+      dashboard           = null;
+      state = { doseTaken: false, medicines: [false, false, false, false], mood: '', chat: [], checkinDoneToday: false };
       showAuthOverlay();
     }
   });
